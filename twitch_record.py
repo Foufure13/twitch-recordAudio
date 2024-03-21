@@ -33,7 +33,7 @@ session.set_option("http-headers", {
 })
 
 class ViewerBot:
-    def __init__(self, nb_of_threads, channel_name):
+    def __init__(self, nb_of_threads, channel_name, record_time):
         self.nb_of_threads = int(nb_of_threads)
         self.channel_name = channel_name
         self.request_count = 0
@@ -42,7 +42,7 @@ class ViewerBot:
         self.thread_semaphore = Semaphore(int(nb_of_threads))
         self.active_threads = 0
         self.should_stop = False
-        self.record_time = 60
+        self.record_time = record_time
 
     def get_proxies(self):
         try:
@@ -128,7 +128,7 @@ if __name__ == '__main__':
     parser.add_argument('-twitchname', type=str, required=True, help='Twitch channel name')
     args = parser.parse_args()
 
-    bot = ViewerBot(nb_of_threads=args.threads, channel_name=args.twitchname)
+    bot = ViewerBot(nb_of_threads=args.threads, channel_name=args.twitchname, record_time=args.recordtime)
     try:
         bot.main()
     except KeyboardInterrupt:
