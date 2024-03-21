@@ -98,7 +98,7 @@ class ViewerBot:
         subprocess.run(trim_command)
         
         # Suppression du fichier temporaire
-        # os.remove(temp_output_file_path)
+        os.remove(temp_output_file_path)
         
         console.print(f"[bold green]Modification terminé et sauvegardé en tant que '{final_output_file_path}'[/bold green]")
         
