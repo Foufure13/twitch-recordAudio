@@ -65,7 +65,7 @@ class ViewerBot:
         return url
 
     def stop(self):
-        console.print("[bold red]record has been stopped[/bold red]")
+        console.print("[bold yellow]record has been stopped[/bold yellow]")
         self.should_stop = True
 
     def record_audio(self):
@@ -107,14 +107,8 @@ class ViewerBot:
             console.print(f"\n[bold green]Enregistrement audio terminé et sauvegardé en tant que '{output_file_path}'[/bold green]")
         else:
             console.print(f"\n[bold red]Erreur lors de l'enregistrement : {error}[/bold red]")
-
-
-
-
-
-        #compteur dynamique
-        
-        self.stop()  # Call stop method to clean up and exit after recording
+        console.print("[bold blue]record has been stopped[/bold blue]")
+        # self.stop()  # Call stop method to clean up and exit after recording
 
 
     def edit_audio(self):
@@ -124,17 +118,15 @@ class ViewerBot:
         temp_output_file_path = os.path.join(output_directory, "temp_output_audio.mp3")
         final_output_file_path = os.path.join(output_directory, "final_output_audio.mp3")
         
-        # Suppression des 13 premières secondes
-        console.print("[bold yellow]Suppression des 13 premières secondes de l'enregistrement[/bold yellow]")
+        console.print("[bold green]Delete the first 13 seconds of the recording[/bold green]")
         trim_command = ['ffmpeg', '-i', temp_output_file_path, '-ss', '13', '-acodec', 'copy', '-loglevel', 'error', final_output_file_path]
         subprocess.run(trim_command)
         
         # Suppression du fichier temporaire
         os.remove(temp_output_file_path)
         
-        console.print(f"[bold green]Modification terminé et sauvegardé en tant que '{final_output_file_path}'[/bold green]")
-        
-        self.stop()  # Arrêter le script après l'enregistrement et le post-traitement
+        console.print(f"[bold blue]Modification terminé et sauvegardé en tant que '{final_output_file_path}'[/bold blue]")
+        # self.stop()  # Arrêter le script après l'enregistrement et le post-traitement
 
 
 
@@ -150,8 +142,8 @@ class ViewerBot:
         edit_thread.start()
         edit_thread.join()  # Wait for the recording to finish
 
-        console.print("[bold green]Enregistrement terminé, le programme va se terminer.[/bold green]")
-        self.stop()  # Ensure any cleanup is done
+        console.print("[bold magenta]Enregistrement terminé, le programme va se terminer.[/bold magenta]")
+        # self.stop()  # Ensure any cleanup is done
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
