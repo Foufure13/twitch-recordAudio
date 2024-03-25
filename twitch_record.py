@@ -65,7 +65,7 @@ class ViewerBot:
         return url
 
     def stop(self):
-        console.print("[bold red]Bot has been stopped[/bold red]")
+        console.print("[bold red]record has been stopped[/bold red]")
         self.should_stop = True
 
     def record_audio(self):
@@ -75,12 +75,44 @@ class ViewerBot:
         
         console.print("[bold green]Début de l'enregistrement audio[/bold green]")
         stream_url = self.get_url()
-        
+        if not stream_url:
+            console.print("[bold red]Impossible de récupérer l'URL du flux[/bold red]")
+            return
+
         self.record_time+=13
 
-        command = ['ffmpeg', '-i', stream_url, '-t', str(self.record_time), '-vn', '-acodec', 'libmp3lame', output_file_path]
-        subprocess.run(command)
-        console.print(f"[bold green]Enregistrement audio terminé et sauvegardé en tant que '{output_file_path}'[/bold green]")
+        #command = ['ffmpeg', '-i', stream_url, '-t', str(self.record_time), '-vn', '-acodec', 'libmp3lame', '-loglevel', 'error', output_file_path]
+        #subprocess.run(command)
+        #console.print(f"[bold green]Enregistrement audio terminé et sauvegardé en tant que '{output_file_path}'[/bold green]")
+        # Progress counter
+        
+        command = ['ffmpeg', '-i', stream_url, '-t', str(self.record_time), '-vn', '-acodec', 'libmp3lame', '-loglevel', 'error', output_file_path]
+        
+        # Exécuter ffmpeg dans un processus séparé
+        process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        
+        # Compteur dynamique
+        # Ici, on suppose que record_time est la durée totale d'enregistrement en secondes
+        for remaining in range(self.record_time, 0, -1):
+            if (remaining > self.record_time-13):
+                console.print(f"[bold yellow]Enregistrement PUB... {remaining} secondes restantes[/bold yellow]", end="\r")
+            else :
+                console.print(f"[bold green]Enregistrement... {remaining} secondes restantes. ^^ [/bold green]", end="\r")
+            time.sleep(1)
+        
+        # Attendre que le processus ffmpeg se termine
+        output, error = process.communicate()
+
+        if process.returncode == 0:
+            console.print(f"\n[bold green]Enregistrement audio terminé et sauvegardé en tant que '{output_file_path}'[/bold green]")
+        else:
+            console.print(f"\n[bold red]Erreur lors de l'enregistrement : {error}[/bold red]")
+
+
+
+
+
+        #compteur dynamique
         
         self.stop()  # Call stop method to clean up and exit after recording
 
@@ -93,8 +125,8 @@ class ViewerBot:
         final_output_file_path = os.path.join(output_directory, "final_output_audio.mp3")
         
         # Suppression des 13 premières secondes
-        console.print("[bold green]Suppression des 13 premières secondes de l'enregistrement[/bold green]")
-        trim_command = ['ffmpeg', '-i', temp_output_file_path, '-ss', '13', '-acodec', 'copy', final_output_file_path]
+        console.print("[bold yellow]Suppression des 13 premières secondes de l'enregistrement[/bold yellow]")
+        trim_command = ['ffmpeg', '-i', temp_output_file_path, '-ss', '13', '-acodec', 'copy', '-loglevel', 'error', final_output_file_path]
         subprocess.run(trim_command)
         
         # Suppression du fichier temporaire
