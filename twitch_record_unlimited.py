@@ -5,6 +5,7 @@ import argparse
 import shutil
 import time
 import datetime
+import glob
 import random
 import requests
 from threading import Thread, Semaphore
@@ -44,6 +45,7 @@ class ViewerBot:
         self.active_threads = 0
         self.record_time = record_time
         self.file_proxy = "proxy.conf"
+        self.max_timerecordfile = 60
 
     def hprint(self,color, texte):
         timestamp = datetime.datetime.now().strftime("%Hh %Mm %Ss")
@@ -62,27 +64,36 @@ class ViewerBot:
     #         console.print("Error retrieving proxies: {}".format(e), style="bold red")
     #         return []
         
+    def del_mp3(self, dossier):
+        motif = os.path.join(dossier, '*.mp3')
+        for file in glob.glob(motif):
+            os.remove(file)
+            self.hprint("",f"file deleted : {file}")
+
+    def clear_diretory(self, dir_inrecord="in_record", dir_record="record"):
+        # self.hprint('green', 'clear_diretory start')
+        if os.path.exists(dir_inrecord) and os.path.exists(dir_record):
+            self.hprint('green', f"dir {dir_inrecord} and {dir_record} exist clearing")
+            self.del_mp3(dir_inrecord)
+            self.del_mp3(dir_record)
+        
     def get_proxies(self):
         if os.path.exists(self.file_proxy):
-            self.hprint("green",f"Le fichier {self.file_proxy} existe déjà.")
+            self.hprint("green",f"The {self.file_proxy} file already exists. ")
             with open(self.file_proxy, 'r') as fichier:
-                contenu = fichier.read()
-                # print(contenu)
+                data = fichier.read()
+                # print(data)
         else:
-            self.hprint("yellow",f"Le fichier {self.file_proxy} n'existe pas. Récupération du contenu depuis l'URL...")
-            # URL à partir de laquelle récupérer le contenu
+            self.hprint("yellow",f"The {self.file_proxy} file does not exist. Content retrieval from URL...")
             url = "https://api.proxyscrape.com/v2/?request=displayproxies&protocol=http&timeout=10000&country=all&ssl=all&anonymity=all"
-            # Effectue la requête GET
             response = requests.get(url)
             
-            # Vérifie si la requête a réussi
             if response.status_code == 200:
-                # Écrit le contenu dans le fichier
                 with open(self.file_proxy, 'w') as fichier:
                     fichier.write(response.text)
-                print(f"Contenu récupéré et écrit dans {self.file_proxy}.")
+                print(f"Content retrieved and written in {self.file_proxy}.")
             else:
-                print("Erreur lors de la récupération du contenu.")
+                print("Error when retrieving content.")
 
     def get_url(self):
         url = ""
@@ -92,6 +103,49 @@ class ViewerBot:
         except Exception as e:
             pass
         return url
+
+
+    def loop_run(self, intervalle):
+
+        try:
+            while True:
+                self.hprint("green","Start scan files............")
+                self.verif_record_move()
+                self.hprint("yellow",f"Attente de {intervalle} secondes avant le prochain traitement.")
+                time.sleep(intervalle)  
+        except KeyboardInterrupt:
+            self.hprint("red","STOP LOOP.")
+
+
+    def verif_record_move(self, dir_inrecord="in_record", dir_record="record"):
+        if not os.path.exists(dir_record):
+            os.makedirs(dir_record)
+        
+        fichiers = [f for f in os.listdir(dir_inrecord) if os.path.isfile(os.path.join(dir_inrecord, f))]
+        if len(fichiers) > 1:
+            # sort file
+            sort_file = sorted(fichiers, key=lambda x: int(x.split('_')[-1].split('.')[0]))
+            fileto_move = sort_file[0]
+            
+            chemin_source = os.path.join(dir_inrecord, fileto_move)
+            chemin_destination = os.path.join(dir_record, fileto_move)
+            
+            # move file
+            shutil.move(chemin_source, chemin_destination)
+            self.hprint("green",f"File moved: {fileto_move}")
+        else:
+            self.hprint("yellow","Not enough files to compare.")
+
+    def compteur(self, ):
+        seconds = 0
+        loop = 0
+        while True:
+            time.sleep(1)  # Attend une seconde
+            seconds += 1
+            print(f"Recording time: {seconds} s // file number : {loop} ", end='\r', flush=True)  # Réinitialise la ligne à chaque fois
+            if seconds == self.max_timerecordfile:
+                loop +=1
+                seconds = 0  # Réinitialise le compteur après 60 seconds
 
 
     def record_audio(self):
@@ -105,65 +159,35 @@ class ViewerBot:
             console.print("[bold red]Impossible de récupérer l'URL du flux[/bold red]")
             return
 
-        self.record_time += 13  # Ajouter un temps supplémentaire pour la publicité, si nécessaire
+        timestamp_complet = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d")
 
-        segment_duration = 60  # Durée maximale d'un segment en secondes
-        num_segments = (self.record_time + segment_duration - 1) // segment_duration  # Calcul du nombre de segments nécessaires
+        output_file_path = os.path.join(in_record_directory, f"{timestamp}_%03d.mp3")
 
+        self.hprint("green", f"start record")
+        thread_compteur = Thread(target=self.compteur)
+        thread_compteur.start()
 
-        for segment in range(num_segments):
-            segment_start_time = segment * segment_duration
-            segment_length = min(segment_duration, self.record_time - segment_start_time)
-
-            # Formatage du nom de fichier avec l'heure actuelle et le numéro de segment
-            timestamp_complet = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-            timestamp = datetime.datetime.now().strftime("%Y-%m-%d")
-
-            # output_file_path = os.path.join(in_record_directory, f"{timestamp}_{segment}.mp3")
-            # final_output_file_path = os.path.join(output_directory, f"{timestamp}_{segment}.mp3")
-
-            output_file_path = os.path.join(in_record_directory, f"{timestamp}_%03d.mp3")
-            final_output_file_path = os.path.join(output_directory, f"{timestamp_complet}.mp3")
-
-
-
-            self.hprint("green", f"start record  {segment + 1}/{num_segments}")
-
-            command = [
-                'ffmpeg', '-i', stream_url, '-ss', str(segment_start_time), 
-                '-t', str(segment_length), '-vn', '-acodec', 'libmp3lame', 
-                '-loglevel', 'error', output_file_path
-            ]
-
-
-            command = ['ffmpeg','-i', stream_url,'-vn','-acodec','libmp3lame','-ar','44100','-ac','2','-map','0:a','-f','segment','-segment_time','60','-segment_format','mp3',output_file_path,'-loglevel', 'error']
-            
-
-            # command = "ffmpeg -i "+stream_url+" -vn -acodec libmp3lame -ar 44100 -ac 2 -map 0:a -f segment -segment_time 60 -segment_format mp3 "+output_file_path+" -loglevel error"
-
-
-            self.hprint('yellow',str(command))
-
-            process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-            output, error = process.communicate()
-
-            if process.returncode == 0:
-                shutil.move(output_file_path, final_output_file_path)
-                self.hprint("green", f"record finsih {segment + 1} saved : '{final_output_file_path}")
-                
-            else:
-                self.hprint("red" ,f"Error on record_ segment {segment + 1}: {error}")
-
-
-
+        command = ['ffmpeg','-i', stream_url,'-vn','-acodec','libmp3lame','-ar','44100','-ac','2','-map','0:a','-f','segment','-segment_time',str(self.max_timerecordfile),'-segment_format','mp3',output_file_path,'-loglevel', 'error']
+        # self.hprint('yellow',str(command))
+        process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        output, error = process.communicate()
+        thread_compteur.do_run = False
+        thread_compteur.join()
 
 
     def main(self):
         self.all_proxies = self.get_proxies()
+        self.clear_diretory()
 
         record_thread = Thread(target=self.record_audio)
         record_thread.start()
-        record_thread.join()  # Wait for the recording to finish
+        # record_thread.join()  # Wait for the recording to finish
+
+
+        loop_run = Thread(target=self.loop_run(30))
+        loop_run.start()
+        loop_run.join()  # Wait for the recording to finish
 
         console.print("[bold magenta]Enregistrement terminé, le programme va se terminer.[/bold magenta]")
 
