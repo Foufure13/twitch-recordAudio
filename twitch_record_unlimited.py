@@ -45,13 +45,18 @@ class ViewerBot:
         self.active_threads = 0
         self.record_time = record_time
         self.file_proxy = "proxy.conf"
-        self.max_timerecordfile = 60
+        self.max_timerecordfile = 30
+        self.running = False
+        self.script_name = "twitch_record"
+        
 
     def hprint(self,color, texte):
         timestamp = datetime.datetime.now().strftime("%Hh %Mm %Ss")
-        console.print("[bold "+color+"] ["+timestamp+"] "+texte+" [/bold "+color+"]")
+        console.print("[bold "+color+"] ["+timestamp+"] ("+self.script_name+") "+texte+" [/bold "+color+"]")
 
-
+    def stop(self, signum, frame):
+            print("\STOPING...")
+            self.running = False
 
     # def get_proxies(self):
     #     try:
@@ -109,9 +114,9 @@ class ViewerBot:
 
         try:
             while True:
-                self.hprint("green","Start scan files............")
+                self.hprint("green","Start scan files...")
                 self.verif_record_move()
-                self.hprint("yellow",f"Attente de {intervalle} secondes avant le prochain traitement.")
+                # self.hprint("yellow",f"wait {intervalle}s for next scan file completed.")
                 time.sleep(intervalle)  
         except KeyboardInterrupt:
             self.hprint("red","STOP LOOP.")
@@ -133,16 +138,22 @@ class ViewerBot:
             # move file
             shutil.move(chemin_source, chemin_destination)
             self.hprint("green",f"File moved: {fileto_move}")
-        else:
-            self.hprint("yellow","Not enough files to compare.")
+        # else:
+            # self.hprint("yellow","Not enough files to compare.")
 
-    def compteur(self, ):
+    def compteur(self ):
         seconds = 0
         loop = 0
+        self.running = True
         while True:
             time.sleep(1)  # Attend une seconde
+            # self.hprint("magenta", f"self.running = {self.running}")
+            if (seconds < 10):
+                print(f"\033[94mRecording time: 0{seconds}s | file : {loop}\033[0m", end='\r', flush=True)  # Réinitialise la ligne à chaque fois
+            else:
+                print(f"\033[94mRecording time: {seconds}s | file : {loop}\033[0m", end='\r', flush=True)  # Réinitialise la ligne à chaque fois
+            
             seconds += 1
-            print(f"Recording time: {seconds} s // file number : {loop} ", end='\r', flush=True)  # Réinitialise la ligne à chaque fois
             if seconds == self.max_timerecordfile:
                 loop +=1
                 seconds = 0  # Réinitialise le compteur après 60 seconds
@@ -165,14 +176,15 @@ class ViewerBot:
         output_file_path = os.path.join(in_record_directory, f"{timestamp}_%03d.mp3")
 
         self.hprint("green", f"start record")
-        thread_compteur = Thread(target=self.compteur)
+        thread_compteur = Thread(target=self.compteur, daemon=True)
         thread_compteur.start()
 
         command = ['ffmpeg','-i', stream_url,'-vn','-acodec','libmp3lame','-ar','44100','-ac','2','-map','0:a','-f','segment','-segment_time',str(self.max_timerecordfile),'-segment_format','mp3',output_file_path,'-loglevel', 'error']
         # self.hprint('yellow',str(command))
         process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         output, error = process.communicate()
-        thread_compteur.do_run = False
+
+        # thread_compteur.do_run = False
         thread_compteur.join()
 
 
@@ -185,7 +197,7 @@ class ViewerBot:
         # record_thread.join()  # Wait for the recording to finish
 
 
-        loop_run = Thread(target=self.loop_run(30))
+        loop_run = Thread(target=self.loop_run, args=(10,), daemon=True)
         loop_run.start()
         loop_run.join()  # Wait for the recording to finish
 
